@@ -1,0 +1,60 @@
+name: 🍣 Sushiro Daily Pipeline
+
+on:
+  # Scheduled task (Cron)
+  # GitHub servers use UTC time.
+  # Beijing Time (UTC+8) 12:00 PM = UTC 04:00 AM
+  schedule:
+    - cron: '0 4 * * *'
+
+  # Allow manual triggering via the Actions tab
+  workflow_dispatch:
+
+# Grant write permissions for the GitHub Actions bot to commit code
+permissions:
+  contents: write
+
+jobs:
+  scrape-and-save:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Set up Python 3.10 environment
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip' # Enable pip cache to speed up daily runs
+
+      # 3. Install dependencies (must include pyarrow for Parquet support)
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests pandas pyarrow
+
+      # 4. Step 1: Run the store update script
+      - name: Update Stores List
+        run: python update_stores.py
+
+      # 5. Step 2: Run the main spider script (scrapes yesterday's data based on the latest store list)
+      - name: Run Spider
+        run: python spider.py
+
+      # 6. Step 3: Commit and push all changes
+      - name: Commit and Push changes
+        run: |
+          # Configure the official GitHub Actions bot identity
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+          # Add all potentially modified files to the staging area
+          # Includes: store list, opening dates record table, and new Parquet files under the data folder
+          git add sushiro_stores.csv store_open_dates.csv data/
+
+          # Check if there are any file changes; if so, Commit and Push
+          git diff --staged --quiet || git commit -m "🚀 Auto update: Stores & Data for $(date -d 'yesterday' +'%Y-%m-%d')"
+          git push
