@@ -166,7 +166,7 @@ def main():
     yesterday = now_bjt - timedelta(days=1)
     target_date = yesterday.strftime("%Y-%m-%d")
 
-    START_DATE = '2025-07-01' # target_date
+    START_DATE = target_date
     END_DATE = target_date
     CALL_DATES = 1      # Keep single-day requests
     MODE = "full"
